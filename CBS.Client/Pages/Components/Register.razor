@@ -1,0 +1,115 @@
+@page "/register/{Type}"
+
+@using CBS.Client.Models
+@using CBS.Client.Services
+@using Microsoft.FluentUI.AspNetCore.Components
+@using System.ComponentModel.DataAnnotations
+@using Icons = Microsoft.FluentUI.AspNetCore.Components.Icons
+@inject IdentityClientService IdentityService
+@inject NavigationManager Navigation
+@inject IToastService ToastService
+
+
+<h3>Register New Account</h3>
+
+<EditForm Model="@registerModel" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <FluentValidationSummary />
+
+    <div>
+        <FluentLabel>
+            <FluentIcon Value="@(new Icons.Regular.Size12.Star())" Color="Color.Error" /> Email
+        </FluentLabel>
+        <FluentTextField @bind-Value="registerModel.Email"
+                         TextFieldType="TextFieldType.Email"
+                         Placeholder="you@example.com"
+                         style="width:80%" />
+        <FluentValidationMessage For="@(() => registerModel.Email)" />
+    </div>
+
+    <div>
+        <FluentLabel>
+            <FluentIcon Value="@(new Icons.Regular.Size12.Star())" Color="Color.Error" /> Password
+        </FluentLabel>
+        <FluentTextField @bind-Value="registerModel.Password"
+                         TextFieldType="TextFieldType.Password"
+                         Placeholder="Min 8 chars, upper, lower, number, symbol"
+                         style="width:60%" />
+        <FluentValidationMessage For="@(() => registerModel.Password)" />
+    </div>
+
+    <div>
+        <FluentLabel>
+            <FluentIcon Value="@(new Icons.Regular.Size12.Star())" Color="Color.Error" /> Confirm Password
+        </FluentLabel>
+        <FluentTextField @bind-Value="registerModel.ConfirmPassword"
+                         TextFieldType="TextFieldType.Password"
+                         Placeholder="Repeat your password"
+                         style="width:60%" />
+        <FluentValidationMessage For="@(() => registerModel.ConfirmPassword)" />
+    </div>
+
+    <div>
+        <FluentLabel>Full Names</FluentLabel>
+        <FluentTextField @bind-Value="registerModel.FullNames"
+                         Placeholder="e.g. Jane Doe"
+                         style="width:100%" />
+        <FluentValidationMessage For="@(() => registerModel.FullNames)" />
+    </div>
+
+    <FluentButton Type="ButtonType.Submit"
+                  Appearance="Appearance.Accent"
+                  Disabled="@isBusy"
+                  style="margin-top:1rem">
+        @(isBusy ? "Registering..." : "Submit")
+    </FluentButton>
+
+</EditForm>
+
+@code {
+    [Parameter]
+    public string Type { get; set; } = "external";
+
+    private RegisterModel registerModel = new();
+    private bool isBusy = false;
+
+    protected override void OnParametersSet()
+    {
+        registerModel.Role = Type == "external" ? "User" : "Staff";
+        registerModel.Type = Type;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (isBusy) return;
+        isBusy = true;
+
+        try
+        {
+            var result = await IdentityService.Register(registerModel);
+
+            if (result.Key)
+            {
+                ToastService.ShowSuccess("Registration successful! Please log in.");
+                await Task.Delay(1500);
+                Navigation.NavigateTo("/login",true);
+            }
+            else
+            {
+                ToastService.ShowError($"Registration failed: {result.Value}");
+            }
+        }
+        catch (HttpRequestException)
+        {
+            ToastService.ShowError("Could not reach the server. Please check your connection and try again.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"An unexpected error occurred: {ex.Message}");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+}

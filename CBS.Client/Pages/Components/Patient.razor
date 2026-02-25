@@ -1,0 +1,162 @@
+﻿@using CBS.Client.Services
+@using CBS.Model.Dto
+@using Microsoft.FluentUI.AspNetCore.Components
+@using static Microsoft.FluentUI.AspNetCore.Components.Icons.Filled.Size24
+@using System.ComponentModel.DataAnnotations
+@using Icons = Microsoft.FluentUI.AspNetCore.Components.Icons
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IdentityClientService IdentityService
+@inject IClientService<PatientDto> Service;
+@inject NavigationManager Navigation
+@inject IToastService ToastService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+<h3>Patient Profile</h3>
+
+@code {
+
+    private string Email { get; set; }=string.Empty;
+    public PatientDto Profile { get; set; } = new();
+    private bool isBusy = false;
+    private FluentCheckbox AidCheckBox=new();
+
+    
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        Email = authState.User.Identity?.Name ?? string.Empty;
+        await LoadProfile();
+        await base.OnParametersSetAsync();
+
+    }
+
+    private async Task LoadProfile()
+    {
+        if (isBusy) return;
+        isBusy = true;
+
+        try
+        {
+                var profile = await IdentityService.GetProfileData<PatientDto>(Email,false);
+                if (profile != null)
+                {
+                    this.Profile = profile;
+                }
+            
+        }
+        catch (HttpRequestException)
+        {
+            ToastService.ShowError("Could not reach the server. Please check your connection and try again.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"An unexpected error occurred: {ex.Message}");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+    
+    private async Task HandleValidSubmit()
+    {
+        if (isBusy) return;
+        isBusy = true;
+
+        try
+        {
+            if (Profile.Id == 0)
+            {
+                await Service.AddNew(Profile);
+
+            }
+            else
+            {
+                await Service.Edit(Profile.Id, Profile);
+            }
+
+           ToastService.ShowSuccess("Profile saved.");
+          
+        }
+        catch (HttpRequestException)
+        {
+            ToastService.ShowError("Could not reach the server. Please check your connection and try again.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"An unexpected error occurred: {ex.Message}");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+}
+<EditForm Model="@Profile" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+
+    <div>
+        <FluentLabel>
+            <FluentIcon Value="@(new Icons.Regular.Size12.Star())"  /> Email
+        </FluentLabel>
+        <FluentTextField @bind-Value="Profile.Email"
+                         TextFieldType="TextFieldType.Email"
+                         Placeholder="you@example.com"
+                         style="width:80%" />
+        <FluentValidationMessage For="@(() => Profile.Email)" />
+    </div>
+    <div>
+        <FluentLabel>Full Names</FluentLabel>
+        <FluentTextField @bind-Value="Profile.FullNames"
+                         Placeholder="e.g. Jane Doe"
+                         style="width:100%" />
+        <FluentValidationMessage For="@(() => Profile.FullNames)" />
+    </div>
+        <div>
+        <FluentLabel>Full Names</FluentLabel>
+        <FluentNumberField @bind-Value="Profile.Age"
+                         Placeholder="e.g. 50"
+                         style="width:10%" />
+        <FluentValidationMessage For="@(() => Profile.Age)" />
+    </div>
+    <div>
+        <FluentLabel>Birth Date</FluentLabel>
+        <InputDate @bind-Value="Profile.BirthDate"
+                          style="width:50%" 
+                      Max="@DateTime.Now">
+        </InputDate>
+
+            <FluentValidationMessage For="@(() => Profile.BirthDate)" />
+        </div>
+        <div>
+        <FluentLabel>Condition</FluentLabel>
+        <FluentTextArea @bind-Value="Profile.Condition"
+                         Placeholder="e.g. Explain you helth condition"
+                         style="width:100%" />
+        <FluentValidationMessage For="@(() => Profile.Condition)" />
+    </div>
+    <div>
+        <FluentCheckbox @ref="AidCheckBox" @bind-Value="Profile.HasMedicalAid"
+        Label="Do you have medical AID" />
+    </div>
+    <div>
+        <FluentLabel>Medical Aid Name</FluentLabel>
+        <FluentTextField @bind-Value="Profile.MedicalAidName"
+                         Placeholder="e.g. Medical Aid Name"
+                         style="width:100%" Disabled="@(AidCheckBox.Value==false)" />
+    <FluentValidationMessage For="@(() => Profile.MedicalAidName)" />
+        </div>
+    <div>
+        <FluentLabel>Policy Number</FluentLabel>
+        <FluentTextField @bind-Value="Profile.PolicyNumber"
+                         Placeholder="e.g. Your Medical AID policy number"
+                         style="width:100%" Disabled="@(AidCheckBox.Value==false)" />
+        <FluentValidationMessage For="@(() => Profile.PolicyNumber)" />
+    </div>
+    <FluentButton Type="ButtonType.Submit"
+                  Appearance="Appearance.Accent"
+                  Disabled="@isBusy"
+                  style="margin-top:1rem">
+        @(isBusy ? "Registering..." : "Submit")
+    </FluentButton>
+
+</EditForm>

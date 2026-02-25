@@ -1,0 +1,12 @@
+@* RedirectToLogin.razor — place in Shared/ folder *@
+@* Redirects unauthenticated users to the OIDC login page *@
+@inject NavigationManager Navigation
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+
+@code {
+    protected override void OnInitialized()
+    {
+        Navigation.NavigateTo(
+            $"authentication/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}");
+    }
+}

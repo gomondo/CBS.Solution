@@ -1,0 +1,63 @@
+﻿@using Blazored.LocalStorage
+@using CBS.Client.Pages.Components
+@using Icon = Microsoft.FluentUI.AspNetCore.Components.Icons
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.FluentUI.AspNetCore.Components
+@inject NavigationManager Navigation
+
+@inherits LayoutComponentBase
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+  <AuthorizeView>
+    <Authorized>
+      <FluentButton OnClick="@(() => { LoginDialog?.Show(); })">Logout</FluentButton>  
+    </Authorized>
+    <NotAuthorized>
+       <FluentButton OnClick="OnLoginOpen">Login</FluentButton>
+     <FluentButton OnClick="OnRegisterOpen">Register</FluentButton>
+    </NotAuthorized>
+</AuthorizeView>
+        </div>
+
+        <article class="content px-4" >
+            @Body
+        </article>
+        <FluentToastProvider MaxToastCount="3"  />
+
+        <FluentDialogProvider />
+    </main>
+</div>
+@code {
+    private bool RegisterHidden = true;
+    private bool LoginHidden = true;
+    public FluentDialog? RegisterDialog;
+    public FluentDialog?  LoginDialog;
+
+    void OnRegisterOpen()
+    {
+        RegisterHidden = false;
+    }
+    void OnLoginOpen()
+    {
+        LoginHidden = false;
+    }
+    void CloseLoginDialog()
+    {
+        LoginHidden = true;
+        Navigation.NavigateTo("profile");
+    }   
+}
+<FluentDialog @ref="RegisterDialog" @bind-Hidden="@RegisterHidden" aria-label="Register a new account..." Modal=true>
+    <FluentDialogHeader Visible="true" ShowDismiss="true" />
+    <Register   />
+</FluentDialog>
+<FluentDialog @ref="LoginDialog" @bind-Hidden="@LoginHidden" aria-label="Login to your account..." Modal=true>
+    <FluentDialogHeader Visible="true" ShowDismiss="true" />
+    <Login OnLoginSuccess="CloseLoginDialog" />
+</FluentDialog>
+ 

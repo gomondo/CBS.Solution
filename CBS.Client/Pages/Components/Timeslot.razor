@@ -1,0 +1,403 @@
+
+@using CBS.Model.Dto
+@using CBS.Client.Services
+@using Microsoft.FluentUI.AspNetCore.Components
+@using Icons = Microsoft.FluentUI.AspNetCore.Components.Icons
+@inject IClientService<TimeSlotDto> TimeSlotService
+@inject IClientService<ClinicDto>   ClinicService
+@inject IToastService ToastService
+
+<h3>Timeslots</h3>
+
+@* ── Toolbar ─────────────────────────────────────────────────────────── *@
+<div style="display:flex; gap:1rem; align-items:center; margin-bottom:1rem;">
+    <FluentButton Appearance="Appearance.Accent" OnClick="OpenCreateDialog">
+        <FluentIcon Value="@(new Icons.Regular.Size16.Add())" />
+        Add Timeslot
+    </FluentButton>
+
+    <FluentSearch Placeholder="Search timeslots…"
+                  @bind-Value="searchTerm"
+                  @oninput="OnSearch"
+                  style="width:280px" />
+</div>
+
+@* ── Grid ─────────────────────────────────────────────────────────────── *@
+@if (isLoading)
+{
+    <FluentProgressRing />
+}
+else if (filteredTimeslots is { Count: 0 })
+{
+    <FluentLabel>No timeslots found.</FluentLabel>
+}
+else
+{
+    <FluentDataGrid Items="@filteredTimeslots.AsQueryable()"
+                    GridTemplateColumns="2fr 1.5fr 1.5fr 1fr 1fr auto"
+                    style="width:100%">
+
+        <PropertyColumn Property="@(t => t.DescriptionSlot)"                            Title="Description" Sortable="true" />
+        <PropertyColumn Property="@(t => t.FromDateTime.ToString("dd MMM yyyy HH:mm"))" Title="From"        Sortable="true" />
+        <PropertyColumn Property="@(t => t.ToDateTime.ToString("dd MMM yyyy HH:mm"))"   Title="To"          Sortable="true" />
+        <PropertyColumn Property="@(t => t.Duration.ToString(@"hh\:mm"))"               Title="Duration" />
+        <PropertyColumn Property="@(t => t.ClinicId)"                                   Title="Clinic ID"   Sortable="true" />
+
+        <TemplateColumn Title="Status">
+            <FluentBadge Appearance="@(context.TimeSlotOpen ? Appearance.Accent : Appearance.Outline)">
+                @(context.TimeSlotOpen ? "Open" : "Booked")
+            </FluentBadge>
+        </TemplateColumn>
+
+        <TemplateColumn Title="Actions">
+            <FluentButton IconStart="@(new Icons.Regular.Size16.Edit())"
+                          Appearance="Appearance.Outline"
+                          Title="Edit"
+                          OnClick="@(() => OpenEditDialog(context))" />
+            <FluentButton IconStart="@(new Icons.Regular.Size16.Delete())"
+                          Appearance="Appearance.Outline"
+                          Title="Delete"
+                          style="margin-left:.5rem"
+                          OnClick="@(() => ConfirmDelete(context))" />
+        </TemplateColumn>
+
+    </FluentDataGrid>
+}
+
+@* ── Create / Edit Dialog ─────────────────────────────────────────────── *@
+<FluentDialog @ref="timeslotDialog"
+              Modal="true"
+              TrapFocus="true"
+              style="--dialog-width:500px">
+    <FluentDialogHeader>@dialogTitle</FluentDialogHeader>
+
+    <FluentDialogBody>
+
+        @if (!string.IsNullOrWhiteSpace(formError))
+        {
+            <FluentMessageBar Intent="MessageIntent.Error" style="margin-bottom:1rem">
+                @((MarkupString)formError)
+            </FluentMessageBar>
+        }
+
+        <div>
+            <FluentLabel>Select A Clinic</FluentLabel>
+
+            <FluentListbox TOption="ClinicDto"
+                           Label="Select a person"
+                           Items="@clinics"
+                           Id="people-listbox"
+                           Height="150px"
+                           OptionValue="@(p => p.Id.ToString())"
+                           OptionText="@(p => p.ClinicName )"
+                           @bind-Value=@selectedClinicId/>
+        </div>
+
+        <div style="margin-top:.75rem">
+            <FluentLabel>
+                <FluentIcon Value="@(new Icons.Regular.Size12.Star())" Color="Color.Error" />
+                Description
+            </FluentLabel>
+            <FluentTextField @bind-Value="timeslotModel.DescriptionSlot"
+                             Placeholder="e.g. Morning Slot A"
+                             style="width:100%" />
+        </div>
+
+        <div style="margin-top:.75rem; display:grid; grid-template-columns:1fr 1fr; gap:.75rem">
+            <div>
+                <FluentLabel>
+                    <FluentIcon Value="@(new Icons.Regular.Size12.Star())" Color="Color.Error" />
+                    From
+                </FluentLabel>
+                <FluentDatePicker @bind-Value="fromDate" style="width:100%" />
+                <FluentTimePicker @bind-Value="fromTime" style="width:100%; margin-top:.35rem" />
+            </div>
+            <div>
+                <FluentLabel>
+                    <FluentIcon Value="@(new Icons.Regular.Size12.Star())" Color="Color.Error" />
+                    To
+                </FluentLabel>
+                <FluentDatePicker @bind-Value="toDate" style="width:100%" />
+                <FluentTimePicker @bind-Value="toTime" style="width:100%; margin-top:.35rem" />
+            </div>
+        </div>
+
+        <div style="margin-top:.75rem; display:flex; align-items:center; gap:.75rem">
+            <FluentLabel>Slot Open</FluentLabel>
+            <FluentSwitch @bind-Value="timeslotModel.TimeSlotOpen" />
+        </div>
+
+    </FluentDialogBody>
+
+    <FluentDialogFooter>
+        <FluentButton Appearance="Appearance.Accent"
+                      Disabled="@isBusy"
+                      OnClick="HandleSubmit">
+            @(isBusy ? "Saving…" : "Save")
+        </FluentButton>
+        <FluentButton Appearance="Appearance.Outline"
+                      OnClick="CloseDialog">
+            Cancel
+        </FluentButton>
+    </FluentDialogFooter>
+</FluentDialog>
+
+@* ── Delete Confirmation Dialog ───────────────────────────────────────── *@
+<FluentDialog @ref="deleteDialog"
+              Modal="true"
+              TrapFocus="true"
+              style="--dialog-width:380px">
+    <FluentDialogHeader>Confirm Delete</FluentDialogHeader>
+    <FluentDialogBody>
+        <FluentLabel>
+            Are you sure you want to delete timeslot
+            <strong>@timeslotToDelete?.DescriptionSlot</strong>?
+            This cannot be undone.
+        </FluentLabel>
+    </FluentDialogBody>
+    <FluentDialogFooter>
+        <FluentButton Appearance="Appearance.Accent"
+                      Disabled="@isBusy"
+                      OnClick="DeleteConfirmed">
+            @(isBusy ? "Deleting…" : "Yes, Delete")
+        </FluentButton>
+        <FluentButton Appearance="Appearance.Outline"
+                      OnClick="@(() => deleteDialog!.Hide())">
+            Cancel
+        </FluentButton>
+    </FluentDialogFooter>
+</FluentDialog>
+
+@code {
+
+    // ── State ────────────────────────────────────────────────────────────
+    private List<TimeSlotDto> timeslots         = new();
+    private List<TimeSlotDto> filteredTimeslots = new();
+    private List<ClinicDto>   clinics           = new();
+
+    private TimeSlotDto  timeslotModel    = new();
+    private TimeSlotDto? timeslotToDelete;
+
+    private FluentDialog? timeslotDialog;
+    private FluentDialog? deleteDialog;
+    [Parameter]
+    public EventCallback<TimeSlotDto> OnTimeslotAdded { get; set; }
+        
+    // Separate date/time pickers — combined into DateTime on submit
+    private DateTime? fromDate;
+    private DateTime? fromTime;
+    private DateTime? toDate;
+    private DateTime? toTime;
+
+    private string formError        = string.Empty;
+    private string searchTerm       = string.Empty;
+    private string selectedClinicId = string.Empty;
+
+    private bool isLoading = true;
+    private bool isBusy    = false;
+    private bool isEditing = false;
+
+    private string dialogTitle => isEditing ? "Edit Timeslot" : "Add Timeslot";
+
+    // ── Lifecycle ────────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        TimeSlotService.EndPoint = "api/timeslot";
+        ClinicService.EndPoint   = "api/clinic";
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            var slotTask   = TimeSlotService.List();
+            var clinicTask = ClinicService.List();
+            await Task.WhenAll(slotTask, clinicTask);
+
+            timeslots = (await slotTask).ToList();
+            clinics   = (await clinicTask).ToList();
+            ApplyFilter();
+        }
+        catch (HttpRequestException)
+        {
+            ToastService.ShowError("Could not reach the server. Please check your connection.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"An unexpected error occurred: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    // ── Search ───────────────────────────────────────────────────────────
+    private void OnSearch(ChangeEventArgs e)
+    {
+        searchTerm = e.Value?.ToString() ?? string.Empty;
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        filteredTimeslots = string.IsNullOrWhiteSpace(searchTerm)
+            ? timeslots
+            : timeslots.Where(t =>
+                t.DescriptionSlot.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                t.ClinicId.ToString().Contains(searchTerm))
+              .ToList();
+    }
+
+    // ── Dialog helpers ───────────────────────────────────────────────────
+    private void OpenCreateDialog()
+    {
+        isEditing        = false;
+        timeslotModel    = new TimeSlotDto { TimeSlotOpen = true };
+        selectedClinicId = string.Empty;
+        fromDate         = fromTime = DateTime.Today;
+        toDate           = toTime   = DateTime.Today.AddHours(1);
+        formError        = string.Empty;
+        timeslotDialog!.Show();
+    }
+
+    private void OpenEditDialog(TimeSlotDto item)
+    {
+        isEditing = true;
+        timeslotModel = new TimeSlotDto
+        {
+            Id              = item.Id,
+            DescriptionSlot = item.DescriptionSlot,
+            FromDateTime    = item.FromDateTime,
+            ToDateTime      = item.ToDateTime,
+            ClinicId        = item.ClinicId,
+            TimeSlotOpen    = item.TimeSlotOpen,
+            AppointmentId   = item.AppointmentId
+        };
+        selectedClinicId = item.ClinicId.ToString();
+        fromDate         = fromTime = item.FromDateTime;
+        toDate           = toTime   = item.ToDateTime;
+        formError        = string.Empty;
+        timeslotDialog!.Show();
+    }
+
+    private void CloseDialog()
+    {
+        formError = string.Empty;
+        timeslotDialog!.Hide();
+    }
+
+    private void ConfirmDelete(TimeSlotDto item)
+    {
+        timeslotToDelete = item;
+        deleteDialog!.Show();
+    }
+
+    // ── Submit ───────────────────────────────────────────────────────────
+    // Validation runs inside ClientService.AddNew / Edit.
+    // Result is KeyValuePair<bool, string> — same pattern as IdentityClientService.
+    private async Task HandleSubmit()
+    {
+        if (isBusy) return;
+
+        // Combine pickers and sync to model before service validates
+        timeslotModel.FromDateTime = CombineDateTime(fromDate, fromTime);
+        timeslotModel.ToDateTime   = CombineDateTime(toDate, toTime);
+
+        if (long.TryParse(selectedClinicId, out var cId))
+            timeslotModel.ClinicId = cId;
+
+        // Client-side guard: end must be after start (not covered by DataAnnotations alone)
+        if (timeslotModel.ToDateTime <= timeslotModel.FromDateTime)
+        {
+            formError = "End date/time must be after the start date/time.";
+            return;
+        }
+
+        isBusy    = true;
+        formError = string.Empty;
+
+        try
+        {
+            var result = isEditing
+                ? await TimeSlotService.Edit(timeslotModel.Id, timeslotModel)
+                : await TimeSlotService.AddNew(timeslotModel);
+
+            if (result.Key)
+            {
+              await OnTimeslotAdded.InvokeAsync(timeslotModel);
+                ToastService.ShowSuccess(isEditing
+                    ? "Timeslot updated successfully."
+                    : "Timeslot created successfully.");
+                CloseDialog();
+                await LoadData();
+            }
+            else
+            {
+                formError = result.Value;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            ToastService.ShowError("Could not reach the server. Please check your connection and try again.");
+        }
+        catch (ArgumentException ex)
+        {
+            formError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"An unexpected error occurred: {ex.Message}");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    // ── Delete ───────────────────────────────────────────────────────────
+    private async Task DeleteConfirmed()
+    {
+        if (timeslotToDelete is null || isBusy) return;
+        isBusy = true;
+
+        try
+        {
+            var result = await TimeSlotService.Delete(timeslotToDelete.Id);
+
+            if (result.Key)
+            {
+                ToastService.ShowSuccess($"Timeslot '{timeslotToDelete.DescriptionSlot}' deleted.");
+                deleteDialog!.Hide();
+                await LoadData();
+            }
+            else
+            {
+                ToastService.ShowError(result.Value);
+            }
+        }
+        catch (HttpRequestException)
+        {
+            ToastService.ShowError("Could not reach the server. Please check your connection and try again.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"An unexpected error occurred: {ex.Message}");
+        }
+        finally
+        {
+            isBusy           = false;
+            timeslotToDelete = null;
+        }
+    }
+
+    // ── Helper ───────────────────────────────────────────────────────────
+    private static DateTime CombineDateTime(DateTime? date, DateTime? time)
+    {
+        var d = date ?? DateTime.Today;
+        var t = time ?? DateTime.Today;
+        return new DateTime(d.Year, d.Month, d.Day, t.Hour, t.Minute, 0);
+    }
+}

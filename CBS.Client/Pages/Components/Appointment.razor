@@ -1,0 +1,419 @@
+
+@using CBS.Model.Dto
+@using CBS.Client.Services
+@using Microsoft.FluentUI.AspNetCore.Components
+@using Icons = Microsoft.FluentUI.AspNetCore.Components.Icons
+@inject IClientService<AppointmentDto> AppointmentService
+@inject IClientService<TimeSlotDto>    TimeSlotService
+@inject IClientService<ClinicDto>      ClinicService
+@inject IToastService ToastService
+
+<h3>Appointments</h3>
+
+@* ── Toolbar ─────────────────────────────────────────────────────────── *@
+<div style="display:flex; gap:1rem; align-items:center; margin-bottom:1rem;">
+    <FluentButton Appearance="Appearance.Accent" OnClick="OpenCreateDialog">
+        <FluentIcon Value="@(new Icons.Regular.Size16.Add())" />
+        Book Appointment
+    </FluentButton>
+
+    <FluentSearch Placeholder="Search appointments…"
+                  @bind-Value="searchTerm"
+                  @oninput="OnSearch"
+                  style="width:280px" />
+</div>
+
+@* ── Grid ─────────────────────────────────────────────────────────────── *@
+@if (isLoading)
+{
+    <FluentProgressRing />
+}
+else if (filteredAppointments is { Count: 0 })
+{
+    <FluentLabel>No appointments found.</FluentLabel>
+}
+else
+{
+    <FluentDataGrid Items="@filteredAppointments.AsQueryable()"
+                    GridTemplateColumns="1fr 1fr 1fr 1fr 1fr auto"
+                    style="width:100%">
+
+        <PropertyColumn Property="@(a => a.Id)"          Title="Ref #"       Sortable="true" />
+        <PropertyColumn Property="@(a => a.PatientId)"   Title="Patient ID"  Sortable="true" />
+        <PropertyColumn Property="@(a => a.StaffId)"     Title="Staff ID"    Sortable="true" />
+        <PropertyColumn Property="@(a => a.ClinicId)"    Title="Clinic ID"   Sortable="true" />
+        <PropertyColumn Property="@(a => a.TimeSlotId)"  Title="Timeslot ID" Sortable="true" />
+
+        <TemplateColumn Title="Status">
+            <FluentBadge Appearance="@(context.IsActive ? Appearance.Accent : Appearance.Outline)">
+                @(context.IsActive ? "Active" : "Inactive")
+            </FluentBadge>
+        </TemplateColumn>
+
+        <TemplateColumn Title="Actions">
+            <FluentButton IconStart="@(new Icons.Regular.Size16.Edit())"
+                          Appearance="Appearance.Outline"
+                          Title="Edit"
+                          OnClick="@(() => OpenEditDialog(context))" />
+            <FluentButton IconStart="@(new Icons.Regular.Size16.Delete())"
+                          Appearance="Appearance.Outline"
+                          Title="Cancel"
+                          style="margin-left:.5rem"
+                          OnClick="@(() => ConfirmDelete(context))" />
+        </TemplateColumn>
+
+    </FluentDataGrid>
+}
+
+@* ── Create / Edit Dialog ─────────────────────────────────────────────── *@
+<FluentDialog @ref="appointmentDialog"
+              Modal="true"
+              TrapFocus="true"
+              style="--dialog-width:500px">
+    <FluentDialogHeader>@dialogTitle</FluentDialogHeader>
+
+    <FluentDialogBody>
+
+        @if (!string.IsNullOrWhiteSpace(formError))
+        {
+            <FluentMessageBar Intent="MessageIntent.Error" style="margin-bottom:1rem">
+                @((MarkupString)formError)
+            </FluentMessageBar>
+        }
+
+        @* Clinic dropdown — drives timeslot cascade *@
+        <div>
+            <FluentLabel>
+                <FluentIcon Value="@(new Icons.Regular.Size12.Star())" Color="Color.Error" />
+                Clinic
+            </FluentLabel>
+      @*       <FluentSelect @bind-Value="selectedClinicId"
+                          style="width:100%"
+                          Placeholder="— select a clinic —"
+                          @onchange="OnClinicChanged">
+                @foreach (var clinic in clinics)
+                {
+                    <FluentOption Value="@clinic.Id.ToString()">@clinic.ClinicName</FluentOption>
+                }
+            </FluentSelect> *@
+        </div>
+
+        @* Timeslot dropdown — filtered by selected clinic *@
+        <div style="margin-top:.75rem">
+            <FluentLabel>
+                <FluentIcon Value="@(new Icons.Regular.Size12.Star())" Color="Color.Error" />
+                Timeslot
+            </FluentLabel>
+    @*         <FluentSelect @bind-Value="selectedTimeslotId"
+                          style="width:100%"
+                          Placeholder="— select a timeslot —"
+                          Disabled="@(!filteredTimeslots.Any())">
+                @foreach (var slot in filteredTimeslots)
+                {
+                    <FluentOption Value="@slot.Id.ToString()">
+                        @slot.DescriptionSlot — @slot.FromDateTime.ToString("dd MMM yyyy HH:mm") to @slot.ToDateTime.ToString("HH:mm")
+                    </FluentOption>
+                }
+            </FluentSelect> *@
+            @if (string.IsNullOrEmpty(selectedClinicId))
+            {
+                <small style="color:var(--neutral-foreground-hint)">Select a clinic first to see available timeslots.</small>
+            }
+        </div>
+
+        <div style="margin-top:.75rem">
+            <FluentLabel>
+                <FluentIcon Value="@(new Icons.Regular.Size12.Star())" Color="Color.Error" />
+                Patient ID
+            </FluentLabel>
+            <FluentNumberField @bind-Value="appointmentModel.PatientId"
+                               Min="1"
+                               style="width:100%" />
+        </div>
+
+        <div style="margin-top:.75rem">
+            <FluentLabel>
+                <FluentIcon Value="@(new Icons.Regular.Size12.Star())" Color="Color.Error" />
+                Staff ID
+            </FluentLabel>
+            <FluentNumberField @bind-Value="appointmentModel.StaffId"
+                               Min="1"
+                               style="width:100%" />
+        </div>
+
+        <div style="margin-top:.75rem; display:flex; align-items:center; gap:.75rem">
+            <FluentLabel>Active</FluentLabel>
+            <FluentSwitch @bind-Value="appointmentModel.IsActive" />
+        </div>
+
+    </FluentDialogBody>
+
+    <FluentDialogFooter>
+        <FluentButton Appearance="Appearance.Accent"
+                      Disabled="@isBusy"
+                      OnClick="HandleSubmit">
+            @(isBusy ? "Saving…" : "Save")
+        </FluentButton>
+        <FluentButton Appearance="Appearance.Outline"
+                      OnClick="CloseDialog">
+            Cancel
+        </FluentButton>
+    </FluentDialogFooter>
+</FluentDialog>
+
+@* ── Delete / Cancel Confirmation ─────────────────────────────────────── *@
+<FluentDialog @ref="deleteDialog"
+              Modal="true"
+              TrapFocus="true"
+              style="--dialog-width:380px">
+    <FluentDialogHeader>Confirm Cancellation</FluentDialogHeader>
+    <FluentDialogBody>
+        <FluentLabel>
+            Are you sure you want to cancel appointment
+            <strong>#@appointmentToDelete?.Id</strong>
+            for Patient ID <strong>@appointmentToDelete?.PatientId</strong>?
+        </FluentLabel>
+    </FluentDialogBody>
+    <FluentDialogFooter>
+        <FluentButton Appearance="Appearance.Accent"
+                      Disabled="@isBusy"
+                      OnClick="DeleteConfirmed">
+            @(isBusy ? "Cancelling…" : "Yes, Cancel It")
+        </FluentButton>
+        <FluentButton Appearance="Appearance.Outline"
+                      OnClick="@(() => deleteDialog!.Hide())">
+            Go Back
+        </FluentButton>
+    </FluentDialogFooter>
+</FluentDialog>
+
+@code {
+
+    // ── State ────────────────────────────────────────────────────────────
+    private List<AppointmentDto> appointments         = new();
+    private List<AppointmentDto> filteredAppointments = new();
+    private List<TimeSlotDto>    allTimeslots         = new();
+    private List<TimeSlotDto>    filteredTimeslots    = new();
+    private List<ClinicDto>      clinics              = new();
+
+    private AppointmentDto  appointmentModel    = new();
+    private AppointmentDto? appointmentToDelete;
+
+    private FluentDialog? appointmentDialog;
+    private FluentDialog? deleteDialog;
+
+    private string formError          = string.Empty;
+    private string searchTerm         = string.Empty;
+    private string selectedClinicId   = string.Empty;
+    private string selectedTimeslotId = string.Empty;
+
+    private bool isLoading = true;
+    private bool isBusy    = false;
+    private bool isEditing = false;
+
+    private string dialogTitle => isEditing ? "Edit Appointment" : "Book Appointment";
+
+    // ── Lifecycle ────────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        AppointmentService.EndPoint = "api/appointment";
+        TimeSlotService.EndPoint    = "api/timeslot";
+        ClinicService.EndPoint      = "api/clinic";
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            var apptTask   = AppointmentService.List();
+            var slotTask   = TimeSlotService.List();
+            var clinicTask = ClinicService.List();
+            await Task.WhenAll(apptTask, slotTask, clinicTask);
+
+            appointments = (await apptTask).ToList();
+            allTimeslots = (await slotTask).ToList();
+            clinics      = (await clinicTask).ToList();
+            ApplyFilter();
+        }
+        catch (HttpRequestException)
+        {
+            ToastService.ShowError("Could not reach the server. Please check your connection.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"An unexpected error occurred: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    // ── Search ───────────────────────────────────────────────────────────
+    private void OnSearch(ChangeEventArgs e)
+    {
+        searchTerm = e.Value?.ToString() ?? string.Empty;
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        filteredAppointments = string.IsNullOrWhiteSpace(searchTerm)
+            ? appointments
+            : appointments.Where(a =>
+                a.Id.ToString().Contains(searchTerm)         ||
+                a.PatientId.ToString().Contains(searchTerm)  ||
+                a.StaffId.ToString().Contains(searchTerm)    ||
+                a.ClinicId.ToString().Contains(searchTerm))
+              .ToList();
+    }
+
+    // ── Clinic → Timeslot cascade ─────────────────────────────────────────
+    private void OnClinicChanged(ChangeEventArgs e)
+    {
+        selectedClinicId   = e.Value?.ToString() ?? string.Empty;
+        selectedTimeslotId = string.Empty;
+
+        filteredTimeslots = long.TryParse(selectedClinicId, out var clinicId)
+            ? allTimeslots.Where(t => t.ClinicId == clinicId && t.TimeSlotOpen).ToList()
+            : new List<TimeSlotDto>();
+
+        appointmentModel.ClinicId = long.TryParse(selectedClinicId, out var cId) ? cId : 0;
+    }
+
+    // ── Dialog helpers ───────────────────────────────────────────────────
+    private void OpenCreateDialog()
+    {
+        isEditing          = false;
+        appointmentModel   = new AppointmentDto { IsActive = true };
+        selectedClinicId   = string.Empty;
+        selectedTimeslotId = string.Empty;
+        filteredTimeslots  = new();
+        formError          = string.Empty;
+        appointmentDialog!.Show();
+    }
+
+    private void OpenEditDialog(AppointmentDto item)
+    {
+        isEditing        = true;
+        appointmentModel = new AppointmentDto
+        {
+            Id         = item.Id,
+            PatientId  = item.PatientId,
+            StaffId    = item.StaffId,
+            IsActive   = item.IsActive,
+            ClinicId   = item.ClinicId,
+            TimeSlotId = item.TimeSlotId
+        };
+        selectedClinicId   = item.ClinicId.ToString();
+        selectedTimeslotId = item.TimeSlotId.ToString();
+        filteredTimeslots  = allTimeslots
+            .Where(t => t.ClinicId == item.ClinicId && (t.TimeSlotOpen || t.AppointmentId == item.Id))
+            .ToList();
+        formError = string.Empty;
+        appointmentDialog!.Show();
+    }
+
+    private void CloseDialog()
+    {
+        formError = string.Empty;
+        appointmentDialog!.Hide();
+    }
+
+    private void ConfirmDelete(AppointmentDto item)
+    {
+        appointmentToDelete = item;
+        deleteDialog!.Show();
+    }
+
+    // ── Submit ───────────────────────────────────────────────────────────
+    // Validation runs inside ClientService.AddNew / Edit.
+    // Result is KeyValuePair<bool, string> — same pattern as IdentityClientService.
+    private async Task HandleSubmit()
+    {
+        if (isBusy) return;
+
+        // Sync dropdown selections into model before service call
+        if (long.TryParse(selectedClinicId, out var cId))
+            appointmentModel.ClinicId = cId;
+        if (long.TryParse(selectedTimeslotId, out var tsId))
+            appointmentModel.TimeSlotId = tsId;
+
+        isBusy    = true;
+        formError = string.Empty;
+
+        try
+        {
+            var result = isEditing
+                ? await AppointmentService.Edit(appointmentModel.Id, appointmentModel)
+                : await AppointmentService.AddNew(appointmentModel);
+
+            if (result.Key)
+            {
+                ToastService.ShowSuccess(isEditing
+                    ? "Appointment updated successfully."
+                    : "Appointment booked successfully.");
+                CloseDialog();
+                await LoadData();
+            }
+            else
+            {
+                formError = result.Value;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            ToastService.ShowError("Could not reach the server. Please check your connection and try again.");
+        }
+        catch (ArgumentException ex)
+        {
+            formError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"An unexpected error occurred: {ex.Message}");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    // ── Delete ───────────────────────────────────────────────────────────
+    private async Task DeleteConfirmed()
+    {
+        if (appointmentToDelete is null || isBusy) return;
+        isBusy = true;
+
+        try
+        {
+            var result = await AppointmentService.Delete(appointmentToDelete.Id);
+
+            if (result.Key)
+            {
+                ToastService.ShowSuccess($"Appointment #{appointmentToDelete.Id} cancelled.");
+                deleteDialog!.Hide();
+                await LoadData();
+            }
+            else
+            {
+                ToastService.ShowError(result.Value);
+            }
+        }
+        catch (HttpRequestException)
+        {
+            ToastService.ShowError("Could not reach the server. Please check your connection and try again.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"An unexpected error occurred: {ex.Message}");
+        }
+        finally
+        {
+            isBusy              = false;
+            appointmentToDelete = null;
+        }
+    }
+}

@@ -1,0 +1,29 @@
+
+trigger:
+  branches:
+    include:
+      - feature/*   # Runs when you push to any feature branch
+
+pool:
+  vmImage: 'windows-latest'
+
+steps:
+  # Step 1: Checkout the branch that triggered the pipeline
+  - checkout: self
+    persistCredentials: true
+
+  # Step 2: Configure Git identity for merge commit
+  - script: |
+      git config user.email "devops-bot@yourcompany.com"
+      git config user.name "DevOps Merge Bot"
+    displayName: "Configure Git User"
+
+  # Step 3: Merge into main
+  - script: |
+      git fetch origin main
+      git checkout main
+      git merge --no-ff $(Build.SourceBranchName) -m "Auto-merge from $(Build.SourceBranchName)"
+      git push origin main
+    displayName: "Merge feature branch into main"
+
+ 

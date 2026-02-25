@@ -1,0 +1,115 @@
+@page "/login"
+@using Blazored.LocalStorage
+@using CBS.Client.Auth
+@using CBS.Client.Models
+@using CBS.Client.Services
+@using Microsoft.FluentUI.AspNetCore.Components
+@using System.ComponentModel.DataAnnotations
+@using Icons = Microsoft.FluentUI.AspNetCore.Components.Icons
+
+@inject ILocalStorageService _localStorage
+@inject IdentityClientService IdentityService    
+@inject IToastService ToastService
+@inject CustomAuthStateProvider AuthenticationProvider
+
+
+<h3>Login</h3>
+
+<EditForm Model="@loginModel" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <FluentValidationSummary />
+
+    <div>
+        <FluentLabel>
+            <FluentIcon Value="@(new Icons.Regular.Size12.Star())" Color="Color.Error" /> Email
+        </FluentLabel>
+        <FluentTextField @bind-Value="loginModel.Email"
+                         TextFieldType="TextFieldType.Email"
+                         Placeholder="you@example.com"
+                         style="width:80%" />
+        <FluentValidationMessage For="@(() => loginModel.Email)" />
+    </div>
+
+    <div>
+        <FluentLabel>
+            <FluentIcon Value="@(new Icons.Regular.Size12.Star())" Color="Color.Error" /> Password
+        </FluentLabel>
+        <FluentTextField @bind-Value="loginModel.Password"
+                         TextFieldType="TextFieldType.Password"
+                         Placeholder="Your password"
+                         style="width:60%" />
+        <FluentValidationMessage For="@(() => loginModel.Password)" />
+    </div>
+
+    <FluentButton Type="ButtonType.Submit"
+                  Appearance="Appearance.Accent"
+                  Disabled="@isBusy"
+                  style="margin-top:1rem">
+        @(isBusy ? "Signing in..." : "Sign In")
+    </FluentButton>
+
+</EditForm>
+
+@code {
+    private LoginModel loginModel = new();
+    private bool isBusy = false;
+
+    [Parameter] public EventCallback OnLoginSuccess { get; set; }
+
+    private async Task HandleClear(ChangeEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(loginModel.Email) && string.IsNullOrWhiteSpace(loginModel.Password))
+        {
+            loginModel.Email = string.Empty;
+            loginModel.Password=string.Empty;   
+        }
+    }
+
+    async Task Logout()
+    {
+        var authState = await AuthenticationProvider.GetAuthenticationStateAsync();
+
+        if (authState != null)
+        {
+            authState = null;
+           await _localStorage.RemoveItemAsync("access_token");
+
+            AuthenticationProvider.NotifyUserLoggedOut();
+        }
+    }
+    private async Task HandleValidSubmit()
+    {
+        if (isBusy) return;
+        isBusy = true;
+
+        try
+        {
+            var result = await IdentityService.Login(loginModel);
+
+            if (result.Key)
+            {
+                var token = result.Value;   
+                await _localStorage.SetItemAsync("access_token", token);
+
+                AuthenticationProvider.NotifyUserAuthenticated(result.Value);//set the response token to the auth provider
+                await OnLoginSuccess.InvokeAsync();    // Notify parent (MainLayout) that login succeeded
+            }
+            else
+            {
+                ToastService.ShowError($"Login failed: {result.Value}");
+            }
+        }
+        catch (HttpRequestException)
+        {
+            ToastService.ShowError("Could not reach the server. Please check your connection.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"An unexpected error occurred: {ex.Message}");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+}

@@ -1,0 +1,63 @@
+﻿@using Icon = Microsoft.FluentUI.AspNetCore.Components.Icons;
+@using Microsoft.FluentUI.AspNetCore.Components
+@using Microsoft.FluentUI.AspNetCore.Components.DesignTokens
+
+<table class="sidebartable">
+    <thead class="thead">
+        <tr>
+            <td>
+                <FluentNavMenu>
+                    <FluentNavLink Href="/" Icon="@(new Icon.Regular.Size24.Home())">Home</FluentNavLink>
+                    <FluentNavLink Href="profile" Icon="@(new Icon.Regular.Size24.Person())">My profile</FluentNavLink>
+                </FluentNavMenu>
+            </td>
+        </tr>
+    </thead>
+    <tbody class="tbody">
+        <tr style="height:30px">
+        </tr>
+        <tr>
+            <td>
+             
+                <AuthorizeView Roles="User,Staff,Admin">
+                    <Authorized>
+                        <FluentNavMenu>
+                            <FluentNavLink Href="clinics" Icon="@(new Icon.Regular.Size24.Doctor())">Available Clinic's</FluentNavLink>
+                            <FluentNavLink Href="practitioners" Icon="@(new Icon.Regular.Size24.Organization())">Healh Practitioners</FluentNavLink>
+                            <FluentNavLink Href="timeslots" Icon="@(new Icon.Regular.Size24.ClockAlarm())">Available Timeslot's</FluentNavLink>
+                            <FluentNavLink Href="bookings" Icon="@(new Icon.Regular.Size24.Calendar())">Your Bookings</FluentNavLink>
+                            <FluentNavLink Href="appointments" Icon="@(new Icon.Regular.Size24.PeopleLink())">Appointments</FluentNavLink>
+                        </FluentNavMenu>
+                    </Authorized>
+                    <NotAuthorized> 
+                     <div>
+                      <FluentLabel>Login you account enable Feutures</FluentLabel>
+                            <FluentLabel>
+                                <FluentIcon Value="@(new Icon.Regular.Size24.Doctor())" /> Available Clinic's
+                            </FluentLabel>
+                            <FluentLabel>
+                                <FluentIcon Value="@(new Icon.Regular.Size24.Organization())" /> Health Practitioners
+                            </FluentLabel>
+                            <FluentLabel>
+                                <FluentIcon Value="@(new Icon.Regular.Size24.ClockAlarm())" /> Available Timeslot's
+                            </FluentLabel>
+                            <FluentLabel>
+                                <FluentIcon Value="@(new Icon.Regular.Size24.PeopleLink())" /> Appointments
+                            </FluentLabel>
+                     </div>
+                    </NotAuthorized>
+                </AuthorizeView>
+ 
+            </td>
+        </tr>
+    </tbody>
+    <tfoot class="tfoot">
+        <tr>
+            <td>
+                <FluentNavMenu>
+                    <FluentNavLink Icon="@(new Icon.Regular.Size24.Settings())">Settings</FluentNavLink>
+                </FluentNavMenu>
+            </td>
+        </tr>
+    </tfoot>
+</table>

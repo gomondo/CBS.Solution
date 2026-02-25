@@ -1,0 +1,365 @@
+
+@using CBS.Model.Dto
+@using CBS.Client.Services
+@using Microsoft.FluentUI.AspNetCore.Components
+@using Icons = Microsoft.FluentUI.AspNetCore.Components.Icons
+@inject IClientService<ClinicDto> ClinicService
+@inject IToastService ToastService
+
+<h3>Clinics</h3>
+ms-appid:P~Microsoft.WindowsNotepad_8wekyb3d8bbwe!App
+@* ── Toolbar ─────────────────────────────────────────────────────────── *@
+<AuthorizeView Roles="Admin">
+<div style="display:flex; gap:1rem; align-items:center; margin-bottom:1rem;">
+    <FluentButton Appearance="Appearance.Accent" OnClick="OpenCreateDialog">
+        <FluentIcon Value="@(new Icons.Regular.Size16.Add())" />
+        Add Clinic
+    </FluentButton>
+    
+    <FluentSearch Placeholder="Search clinics…"
+                  @bind-Value="searchTerm"
+                  @oninput="OnSearch"
+                  style="width:280px" />
+</div>
+</AuthorizeView>
+@* ── Grid ─────────────────────────────────────────────────────────────── *@
+@if (isLoading)
+{
+    <FluentProgressRing />
+}
+else if (filteredClinics is { Count: 0 })
+{
+    <FluentLabel>No clinics found.</FluentLabel>
+}
+else
+{
+    <FluentDataGrid Items="@filteredClinics.AsQueryable()"
+                    GridTemplateColumns="1.5fr 2fr 1fr 1fr 1fr auto"
+                    style="width:100%">
+
+        <PropertyColumn Property="@(c => c.ClinicName)" Title="Clinic Name" Sortable="true" />
+        <PropertyColumn Property="@(c => c.Address)"    Title="Address"     Sortable="true" />
+        <PropertyColumn Property="@(c => c.Surbarbs)"   Title="Suburb"      Sortable="true" />
+        <PropertyColumn Property="@(c => c.City)"       Title="City"        Sortable="true" />
+        <PropertyColumn Property="@(c => c.PostalCode)" Title="Postal Code" Sortable="true" />
+
+        <TemplateColumn Title="Actions">
+            <FluentButton IconStart="@(new Icons.Regular.Size16.Edit())"
+                          Appearance="Appearance.Outline"
+                          Title="Edit"
+                          OnClick="@(() => OpenEditDialog(context))" />
+            <FluentButton IconStart="@(new Icons.Regular.Size16.Delete())"
+                          Appearance="Appearance.Outline"
+                          Title="Delete"
+                          style="margin-left:.5rem"
+                          OnClick="@(() => ConfirmDelete(context))" />
+        </TemplateColumn>
+
+    </FluentDataGrid>
+}
+
+@* ── Create / Edit Dialog ─────────────────────────────────────────────── *@
+<FluentDialog @ref="clinicDialog"
+              Modal="true"
+              TrapFocus="true"
+              style="--dialog-width:520px">
+    <FluentDialogHeader>@dialogTitle</FluentDialogHeader>
+
+    <FluentDialogBody>
+
+        @if (!string.IsNullOrWhiteSpace(formError))
+        {
+            <FluentMessageBar Intent="MessageIntent.Error" style="margin-bottom:1rem">
+                @((MarkupString)formError)
+            </FluentMessageBar>
+        }
+
+        <div>
+            <FluentLabel>
+                <FluentIcon Value="@(new Icons.Regular.Size12.Star())" Color="Color.Error" />
+                Clinic Name
+            </FluentLabel>
+            <FluentTextField @bind-Value="clinicModel.ClinicName"
+                             Placeholder="e.g. Sunrise Medical Centre"
+                             style="width:100%" />
+        </div>
+
+        <div style="margin-top:.75rem">
+            <FluentLabel>
+                <FluentIcon Value="@(new Icons.Regular.Size12.Star())" Color="Color.Error" />
+                Address
+            </FluentLabel>
+            <FluentTextField @bind-Value="clinicModel.Address"
+                             Placeholder="e.g. 12 Main Road"
+                             style="width:100%" />
+        </div>
+
+        <div style="margin-top:.75rem; display:grid; grid-template-columns:1fr 1fr; gap:.75rem">
+            <div>
+                <FluentLabel>
+                    <FluentIcon Value="@(new Icons.Regular.Size12.Star())" Color="Color.Error" />
+                    Suburb
+                </FluentLabel>
+                <FluentTextField @bind-Value="clinicModel.Surbarbs"
+                                 Placeholder="e.g. Hatfield"
+                                 style="width:100%" />
+            </div>
+            <div>
+                <FluentLabel>
+                    <FluentIcon Value="@(new Icons.Regular.Size12.Star())" Color="Color.Error" />
+                    Postal Code
+                </FluentLabel>
+                <FluentTextField @bind-Value="clinicModel.PostalCode"
+                                 Placeholder="e.g. 0028"
+                                 style="width:100%" />
+            </div>
+        </div>
+
+        <div style="margin-top:.75rem; display:grid; grid-template-columns:1fr 1fr; gap:.75rem">
+            <div>
+                <FluentLabel>City</FluentLabel>
+                <FluentTextField @bind-Value="clinicModel.City"
+                                 Placeholder="e.g. Pretoria"
+                                 style="width:100%" />
+            </div>
+            <div>
+                <FluentLabel>Province</FluentLabel>
+                <FluentTextField @bind-Value="clinicModel.Province"
+                                 Placeholder="e.g. Gauteng"
+                                 style="width:100%" />
+            </div>
+        </div>
+
+    </FluentDialogBody>
+
+    <FluentDialogFooter>
+        <FluentButton Appearance="Appearance.Accent"
+                      Disabled="@isBusy"
+                      OnClick="HandleSubmit">
+            @(isBusy ? "Saving…" : "Save")
+        </FluentButton>
+        <FluentButton Appearance="Appearance.Outline"
+                      OnClick="CloseDialog">
+            Cancel
+        </FluentButton>
+    </FluentDialogFooter>
+</FluentDialog>
+
+@* ── Delete Confirmation Dialog ───────────────────────────────────────── *@
+<FluentDialog @ref="deleteDialog"
+              Modal="true"
+              TrapFocus="true"
+              style="--dialog-width:380px">
+    <FluentDialogHeader>Confirm Delete</FluentDialogHeader>
+    <FluentDialogBody>
+        <FluentLabel>
+            Are you sure you want to delete clinic
+            <strong>@clinicToDelete?.ClinicName</strong>?
+            This action cannot be undone.
+        </FluentLabel>
+    </FluentDialogBody>
+    <FluentDialogFooter>
+        <FluentButton Appearance="Appearance.Accent"
+                      Disabled="@isBusy"
+                      OnClick="DeleteConfirmed">
+            @(isBusy ? "Deleting…" : "Yes, Delete")
+        </FluentButton>
+        <FluentButton Appearance="Appearance.Outline"
+                      OnClick="@(() => deleteDialog!.Hide())">
+            Cancel
+        </FluentButton>
+    </FluentDialogFooter>
+</FluentDialog>
+
+@code {
+
+    // ── State ────────────────────────────────────────────────────────────
+    private List<ClinicDto> clinics         = new();
+    private List<ClinicDto> filteredClinics = new();
+
+    private ClinicDto  clinicModel    = new();
+    private ClinicDto? clinicToDelete;
+
+    private FluentDialog? clinicDialog;
+    private FluentDialog? deleteDialog;
+
+    private string formError  = string.Empty;
+    private string searchTerm = string.Empty;
+
+    private bool isLoading = true;
+    private bool isBusy    = false;
+    private bool isEditing = false;
+
+    private string dialogTitle => isEditing ? "Edit Clinic" : "Add Clinic";
+
+    // ── Lifecycle ────────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        ClinicService.EndPoint = "api/clinic";
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            var result = await ClinicService.List();
+            clinics = result.ToList();
+            ApplyFilter();
+        }
+        catch (HttpRequestException)
+        {
+            ToastService.ShowError("Could not reach the server. Please check your connection.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"An unexpected error occurred: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    // ── Search ───────────────────────────────────────────────────────────
+    private void OnSearch(ChangeEventArgs e)
+    {
+        searchTerm = e.Value?.ToString() ?? string.Empty;
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        filteredClinics = string.IsNullOrWhiteSpace(searchTerm)
+            ? clinics
+            : clinics.Where(c =>
+                c.ClinicName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                c.Address.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)    ||
+                c.Surbarbs.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)   ||
+                c.City.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)        ||
+                c.PostalCode.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+              .ToList();
+    }
+
+    // ── Dialog helpers ───────────────────────────────────────────────────
+    private void OpenCreateDialog()
+    {
+        isEditing   = false;
+        clinicModel = new ClinicDto();
+        formError   = string.Empty;
+        clinicDialog!.Show();
+    }
+
+    private void OpenEditDialog(ClinicDto item)
+    {
+        isEditing = true;
+        clinicModel = new ClinicDto
+        {
+            Id         = item.Id,
+            ClinicName = item.ClinicName,
+            Address    = item.Address,
+            PostalCode = item.PostalCode,
+            Surbarbs   = item.Surbarbs,
+            City       = item.City,
+            Province   = item.Province
+        };
+        formError = string.Empty;
+        clinicDialog!.Show();
+    }
+
+    private void CloseDialog()
+    {
+        formError = string.Empty;
+        clinicDialog!.Hide();
+    }
+
+    private void ConfirmDelete(ClinicDto item)
+    {
+        clinicToDelete = item;
+        deleteDialog!.Show();
+    }
+
+    // ── Submit ───────────────────────────────────────────────────────────
+    // Validation runs inside ClientService.AddNew / Edit and is returned
+    // as KeyValuePair<bool, string> — same pattern as IdentityClientService.
+    private async Task HandleSubmit()
+    {
+        if (isBusy) return;
+        isBusy    = true;
+        formError = string.Empty;
+
+        try
+        {
+            var result = isEditing
+                ? await ClinicService.Edit(clinicModel.Id, clinicModel)
+                : await ClinicService.AddNew(clinicModel);
+
+            if (result.Key)
+            {
+                ToastService.ShowSuccess(isEditing
+                    ? "Clinic updated successfully."
+                    : "Clinic created successfully.");
+                CloseDialog();
+                await LoadData();
+            }
+            else
+            {
+                // Validation errors or API rejection — surface inside the dialog
+                formError = result.Value;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            ToastService.ShowError("Could not reach the server. Please check your connection and try again.");
+        }
+        catch (ArgumentException ex)
+        {
+            formError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"An unexpected error occurred: {ex.Message}");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    // ── Delete ───────────────────────────────────────────────────────────
+    private async Task DeleteConfirmed()
+    {
+        if (clinicToDelete is null || isBusy) return;
+        isBusy = true;
+
+        try
+        {
+            var result = await ClinicService.Delete(clinicToDelete.Id);
+
+            if (result.Key)
+            {
+                ToastService.ShowSuccess($"Clinic '{clinicToDelete.ClinicName}' deleted.");
+                deleteDialog!.Hide();
+                await LoadData();
+            }
+            else
+            {
+                ToastService.ShowError(result.Value);
+            }
+        }
+        catch (HttpRequestException)
+        {
+            ToastService.ShowError("Could not reach the server. Please check your connection and try again.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"An unexpected error occurred: {ex.Message}");
+        }
+        finally
+        {
+            isBusy         = false;
+            clinicToDelete = null;
+        }
+    }
+}

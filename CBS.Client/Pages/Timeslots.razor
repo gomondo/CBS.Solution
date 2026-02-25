@@ -1,0 +1,133 @@
+@page "/timeslots"
+@using CBS.Model.Dto
+@using CBS.Client.Services
+@using CBS.Client.Pages.Components
+@using Microsoft.FluentUI.AspNetCore.Components
+@using Icons = Microsoft.FluentUI.AspNetCore.Components.Icons
+@inject IClientService<TimeSlotDto> Service
+@inject IClientService<ClinicDto> ClinicService
+@inject IToastService ToastService
+
+<FluentLabel Typo="Typography.H3">Timeslots</FluentLabel>
+<div>
+ <div style="margin: 12px 0;"> 
+   <FluentSearch Placeholder="Search by practitioner or clinic..."
+                  @bind-Value="searchFilter"
+                  @oninput="HandleSearchInput"
+                  @bind-Value:after="HandleClear"
+                  Style="width: 320px;" />
+</div> 
+ <div style="margin: 12px 0;"> 
+    <AuthorizeView Roles="Staff,Admin">
+    <FluentButton Appearance="Appearance.Accent" OnClick="AddNewTimeSlotDialog">
+        <FluentIcon Value="@(new Icons.Regular.Size16.Add())" />
+        Add Booking
+    </FluentButton>
+    </AuthorizeView>
+</div>
+    </div>
+ <div style="height: 520px; overflow-x: auto; display: flex;"> 
+     <FluentDataGrid @ref="grid"
+                    Items="@FilteredItems"
+                    ResizableColumns="true"
+                    GridTemplateColumns="0.6fr 1.2fr 1fr 0.8fr 0.7fr 0.7fr 0.7fr"
+                    Pagination="@pagination"
+                    TGridItem="TimeSlotDto">
+        <PropertyColumn Property="@(t => t.Id)" Title="ID" Sortable="true" Align="Align.Center" />
+        <PropertyColumn Property="@(t => t.FullNames)" Title="Practitioner" Sortable="true" Filtered="!string.IsNullOrWhiteSpace(searchFilter)">
+            <ColumnOptions>
+                <div class="search-box">
+                    <FluentSearch Autofocus="true"
+                                  @bind-Value="searchFilter"
+                                  @oninput="HandleSearchInput"
+                                  @onkeydown="HandleCloseFilterAsync"
+                                  @bind-Value:after="HandleClear"
+                                  Placeholder="Practitioner name..."
+                                  Style="width: 100%;"
+                                  Label="Filter" />
+                </div>
+            </ColumnOptions>
+        </PropertyColumn>
+        <PropertyColumn Property="@(t => t.ClinicName)" Title="Clinic" Sortable="true" />
+        <PropertyColumn Property="@(t => t.FromDateTime.Date)" Title="Start Date" Sortable="true" Format="dd MMM yyyy" IsDefaultSortColumn="true" InitialSortDirection="SortDirection.Ascending" />
+        <PropertyColumn Property="@(t => t.FromDateTime.TimeOfDay)" Title="Start Time" Sortable="true" />
+        <PropertyColumn Property="@(t => t.ToDateTime.Date)" Title="End Date" Sortable="true" Format="dd MMM yyyy" IsDefaultSortColumn="true" InitialSortDirection="SortDirection.Ascending" />
+        <PropertyColumn Property="@(t => t.ToDateTime.TimeOfDay)" Title="End Time" Sortable="true" />
+        <TemplateColumn Title="Available" Align="Align.Center">
+            @if (context.IsAvailable)
+            {
+                <FluentBadge Appearance="Appearance.Accent">Open</FluentBadge>
+            }
+            else
+            {
+                <FluentBadge Appearance="Appearance.Neutral">Booked</FluentBadge>
+            }
+        </TemplateColumn>
+    </FluentDataGrid>
+
+    <FluentDialog @ref="TimeslotDialog" @bind-Hidden="@TimeslotDialogHidden"  Modal=true>
+        <FluentDialogHeader Visible="true" ShowDismiss="true" />
+        <Timeslot OnTimeslotAdded="OnTimeslotAdded" />
+    </FluentDialog>
+</div>
+
+<FluentPaginator State="@pagination" />
+
+@code {
+    FluentDataGrid<TimeSlotDto>? grid;
+    FluentDialog? TimeslotDialog;
+    private bool TimeslotDialogHidden = true;
+    IQueryable<TimeSlotDto>? items;
+    TimeSlotDto Timeslot;
+
+    PaginationState pagination = new PaginationState { ItemsPerPage = 12 };
+
+    string searchFilter = string.Empty;
+        private void OnTimeslotAdded(TimeSlotDto newTimeslot)
+        {
+            items = items?.Append(newTimeslot).AsQueryable();
+    }
+    public void AddNewTimeSlotDialog()
+    {
+     this.TimeslotDialogHidden = false; 
+    }
+    IQueryable<TimeSlotDto>? FilteredItems
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(searchFilter))
+                return items;
+
+            return items?.Where(t =>
+                t.FullNames.Contains(searchFilter, StringComparison.CurrentCultureIgnoreCase) ||
+                t.ClinicName.Contains(searchFilter, StringComparison.CurrentCultureIgnoreCase));
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var data = await Service.List();
+        items = data.AsQueryable();
+    }
+
+    private void HandleSearchInput(ChangeEventArgs args)
+    {
+        if (args.Value is string value)
+            searchFilter = value;
+    }
+
+    private void HandleClear()
+    {
+        if (string.IsNullOrWhiteSpace(searchFilter))
+            searchFilter = string.Empty;
+    }
+
+    private async Task HandleCloseFilterAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+            searchFilter = string.Empty;
+
+        if (args.Key == "Enter" && grid is not null)
+            await grid.CloseColumnOptionsAsync();
+    } 
+}

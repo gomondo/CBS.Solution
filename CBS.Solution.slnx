@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="CBS.Api/CBS.Api.csproj" Id="14178aff-60d1-4ccb-b4ca-d9d7b8fe60ee" />
+  <Project Path="CBS.BLL/CBS.BLL.csproj" Id="c751c6ae-5f3e-4459-ac70-2a02623dbeb4" />
+  <Project Path="CBS.Client/CBS.Client.csproj" />
+  <Project Path="CBS.Data/CBS.DAL.csproj" Id="b9f345d3-9478-4ccb-9fb8-a62a0351a89c" />
+  <Project Path="CBS.Model/CBS.Model.csproj" Id="1b7585a2-f37d-4377-94b7-f6aadb85399a" />
+</Solution>

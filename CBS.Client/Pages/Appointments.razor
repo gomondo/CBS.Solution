@@ -1,0 +1,298 @@
+@page "/appointments"
+@using CBS.Model.Dto
+@using CBS.Client.Services
+@using Microsoft.FluentUI.AspNetCore.Components
+@using Icons = Microsoft.FluentUI.AspNetCore.Components.Icons
+@inject IClientService<AppointmentDto> AppointmentService
+@inject IClientService<StaffDto>       StaffService
+@inject IClientService<ClinicDto>      ClinicService
+@inject IClientService<TimeSlotDto>    TimeSlotService
+@inject IToastService ToastService
+
+<FluentLabel Typo="Typography.H3">Appointments</FluentLabel>
+<FluentLabel Typo="Typography.Body">Accepted appointments confirmed by staff or practitioners.</FluentLabel>
+
+@* ── Toolbar ─────────────────────────────────────────────────────────── *@
+<div style="margin:12px 0; display:flex; gap:1rem; align-items:center;">
+    <FluentSearch Placeholder="Search patient or practitioner..."
+                  @bind-Value="searchFilter"
+                  @oninput="HandleSearchInput"
+                  @bind-Value:after="HandleClear"
+                  Style="width:320px;" />
+    @if (isLoading)
+    {
+        <FluentProgressRing Style="width:20px; height:20px;" />
+    }
+    else
+    {
+        <FluentBadge Appearance="Appearance.Accent">
+            @FilteredItems?.Count() confirmed
+        </FluentBadge>
+    }
+</div>
+
+@* ── Grid ─────────────────────────────────────────────────────────────── *@
+<div style="height:520px; overflow-x:auto; display:flex;">
+    <FluentDataGrid @ref="grid"
+                    Items="@FilteredItems"
+                    ResizableColumns="true"
+                    GridTemplateColumns="0.6fr 1.2fr 1.3fr 1.1fr 0.9fr 0.7fr 0.7fr 0.8fr"
+                    Pagination="@pagination"
+                    TGridItem="AppointmentDto">
+
+        <PropertyColumn Property="@(a => a.Id)"
+                        Title="Ref #"
+                        Sortable="true"
+                        Align="Align.Center" />
+
+        <TemplateColumn Title="Patient" Sortable="false"
+                        Filtered="!string.IsNullOrWhiteSpace(searchFilter)">
+            <ColumnOptions>
+                <div class="search-box">
+                    <FluentSearch Autofocus="true"
+                                  @bind-Value="searchFilter"
+                                  @oninput="HandleSearchInput"
+                                  @onkeydown="HandleCloseFilterAsync"
+                                  @bind-Value:after="HandleClear"
+                                  Placeholder="Patient ID..."
+                                  Style="width:100%;"
+                                  Label="Filter" />
+                </div>
+            </ColumnOptions>
+        </TemplateColumn>
+
+        <TemplateColumn Title="Practitioner" Sortable="false">
+            @GetPractitionerName(context.StaffId)
+        </TemplateColumn>
+
+        <TemplateColumn Title="Clinic" Sortable="false">
+            @GetClinicName(context.ClinicId)
+        </TemplateColumn>
+
+        <TemplateColumn Title="Date" Sortable="false">
+            @GetSlotDate(context.TimeSlotId)
+        </TemplateColumn>
+
+        <TemplateColumn Title="Time" Sortable="false">
+            @GetSlotTime(context.TimeSlotId)
+        </TemplateColumn>
+
+        <TemplateColumn Title="Status" Align="Align.Center">
+            <FluentBadge Appearance="Appearance.Accent">Confirmed</FluentBadge>
+        </TemplateColumn>
+
+        <TemplateColumn Title="Actions" Align="Align.Center">
+            <FluentButton Appearance="Appearance.Outline"
+                          Title="Cancel this appointment"
+                          Disabled="@isBusy"
+                          IconStart="@(new Icons.Regular.Size16.CalendarCancel())"
+                          OnClick="@(() => ConfirmCancel(context))">
+                Cancel
+            </FluentButton>
+        </TemplateColumn>
+
+    </FluentDataGrid>
+</div>
+
+<FluentPaginator State="@pagination" />
+
+@* ── Cancel Confirmation Dialog ───────────────────────────────────────── *@
+<FluentDialog @ref="cancelDialog"
+              Modal="true"
+              TrapFocus="true"
+              style="--dialog-width:440px">
+    <FluentDialogHeader>Cancel Appointment</FluentDialogHeader>
+    <FluentDialogBody>
+        <FluentLabel>
+            Are you sure you want to cancel appointment <strong>#@pendingItem?.Id</strong> for
+            Patient <strong>#@pendingItem?.PatientId</strong> with
+            <strong>@GetPractitionerName(pendingItem?.StaffId ?? 0)</strong>?
+        </FluentLabel>
+        <FluentLabel style="margin-top:.5rem; display:block; color:var(--neutral-foreground-hint)">
+            The appointment will be permanently removed and the timeslot will become available again.
+        </FluentLabel>
+        @if (!string.IsNullOrWhiteSpace(actionError))
+        {
+            <FluentMessageBar Intent="MessageIntent.Error" style="margin-top:.75rem">
+                @actionError
+            </FluentMessageBar>
+        }
+    </FluentDialogBody>
+    <FluentDialogFooter>
+        <FluentButton Appearance="Appearance.Accent"
+                      Disabled="@isBusy"
+                      OnClick="ExecuteCancel">
+            @(isBusy ? "Cancelling…" : "Yes, Cancel It")
+        </FluentButton>
+        <FluentButton Appearance="Appearance.Outline"
+                      OnClick="@(() => cancelDialog!.Hide())">
+            Go Back
+        </FluentButton>
+    </FluentDialogFooter>
+</FluentDialog>
+
+@code {
+
+    // ── State ────────────────────────────────────────────────────────────
+    FluentDataGrid<AppointmentDto>? grid;
+    PaginationState pagination = new PaginationState { ItemsPerPage = 12 };
+
+    private List<AppointmentDto> allItems     = new();
+    private List<StaffDto>       allStaff     = new();
+    private List<ClinicDto>      allClinics   = new();
+    private List<TimeSlotDto>    allTimeslots = new();
+
+    private AppointmentDto? pendingItem;   // item awaiting cancel confirmation
+    private FluentDialog?   cancelDialog;
+
+    private string searchFilter = string.Empty;
+    private string actionError  = string.Empty;
+    private bool   isLoading    = true;
+    private bool   isBusy       = false;
+
+    // ── Filtered view: only records where IsActive == true (confirmed appointments) ──
+    private IQueryable<AppointmentDto>? FilteredItems
+    {
+        get
+        {
+            // Base: only confirmed (accepted by practitioner)
+            var confirmed = allItems.Where(a => a.IsActive);
+
+            if (!string.IsNullOrWhiteSpace(searchFilter))
+            {
+                confirmed = confirmed.Where(a =>
+                    a.PatientId.ToString().Contains(searchFilter)                                              ||
+                    GetPractitionerName(a.StaffId).Contains(searchFilter, StringComparison.CurrentCultureIgnoreCase) ||
+                    GetClinicName(a.ClinicId).Contains(searchFilter, StringComparison.CurrentCultureIgnoreCase));
+            }
+
+            return confirmed.AsQueryable();
+        }
+    }
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        AppointmentService.EndPoint = "api/appointment";
+        StaffService.EndPoint       = "api/staff";
+        ClinicService.EndPoint      = "api/clinic";
+        TimeSlotService.EndPoint    = "api/timeslot";
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            var apptTask   = AppointmentService.List();
+            var staffTask  = StaffService.List();
+            var clinicTask = ClinicService.List();
+            var slotTask   = TimeSlotService.List();
+            await Task.WhenAll(apptTask, staffTask, clinicTask, slotTask);
+
+            allItems     = (await apptTask).ToList();
+            allStaff     = (await staffTask).ToList();
+            allClinics   = (await clinicTask).ToList();
+            allTimeslots = (await slotTask).ToList();
+        }
+        catch (HttpRequestException)
+        {
+            ToastService.ShowError("Could not reach the server. Please check your connection.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"An unexpected error occurred: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    // ── Lookup helpers ────────────────────────────────────────────────────
+    private string GetPractitionerName(long staffId)
+        => allStaff.FirstOrDefault(s => s.Id == staffId)?.FullNames ?? $"Staff #{staffId}";
+
+    private string GetClinicName(long clinicId)
+        => allClinics.FirstOrDefault(c => c.Id == clinicId)?.ClinicName ?? $"Clinic #{clinicId}";
+
+    private string GetSlotDate(long slotId)
+    {
+        var slot = allTimeslots.FirstOrDefault(t => t.Id == slotId);
+        return slot is null ? "—" : slot.FromDateTime.ToString("dd MMM yyyy");
+    }
+
+    private string GetSlotTime(long slotId)
+    {
+        var slot = allTimeslots.FirstOrDefault(t => t.Id == slotId);
+        return slot is null ? "—" : $"{slot.FromDateTime:HH:mm} – {slot.ToDateTime:HH:mm}";
+    }
+
+    // ── Search ────────────────────────────────────────────────────────────
+    private void HandleSearchInput(ChangeEventArgs args)
+    {
+        if (args.Value is string value)
+            searchFilter = value;
+    }
+
+    private void HandleClear()
+    {
+        if (string.IsNullOrWhiteSpace(searchFilter))
+            searchFilter = string.Empty;
+    }
+
+    private async Task HandleCloseFilterAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+            searchFilter = string.Empty;
+
+        if (args.Key == "Enter" && grid is not null)
+            await grid.CloseColumnOptionsAsync();
+    }
+
+    // ── Cancel flow ───────────────────────────────────────────────────────
+    // Cancelling = hard delete. The timeslot is freed on the server side.
+    private void ConfirmCancel(AppointmentDto item)
+    {
+        pendingItem = item;
+        actionError = string.Empty;
+        cancelDialog!.Show();
+    }
+
+    private async Task ExecuteCancel()
+    {
+        if (pendingItem is null || isBusy) return;
+        isBusy      = true;
+        actionError = string.Empty;
+
+        try
+        {
+            var result = await AppointmentService.Delete(pendingItem.Id);
+
+            if (result.Key)
+            {
+                ToastService.ShowSuccess($"Appointment #{pendingItem.Id} cancelled.");
+                cancelDialog!.Hide();
+                await LoadData();
+            }
+            else
+            {
+                actionError = result.Value;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            actionError = "Could not reach the server. Please check your connection and try again.";
+        }
+        catch (Exception ex)
+        {
+            actionError = $"An unexpected error occurred: {ex.Message}";
+        }
+        finally
+        {
+            isBusy      = false;
+            pendingItem = null;
+        }
+    }
+}

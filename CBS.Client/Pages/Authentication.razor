@@ -1,0 +1,11 @@
+@* Authentication.razor — place in Pages/ folder *@
+@* This page handles all OIDC login/logout callbacks automatically *@
+@page "/authentication/{action}"
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+
+<RemoteAuthenticatorView Action="@Action" />
+
+@code {
+    [Parameter]
+    public string? Action { get; set; }
+}

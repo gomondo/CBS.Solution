@@ -1,0 +1,155 @@
+﻿@using CBS.Client.Services
+@using CBS.Model.Dto
+@using Microsoft.FluentUI.AspNetCore.Components
+@using static Microsoft.FluentUI.AspNetCore.Components.Icons.Filled.Size24
+@using System.ComponentModel.DataAnnotations
+@using Icons = Microsoft.FluentUI.AspNetCore.Components.Icons
+@inject IdentityClientService IdentityService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IClientService<StaffDto> Service;
+@inject IClientService<ClinicDto> ClinicService;
+@inject IToastService ToastService
+    
+<h3>Helth Practision</h3>
+
+<EditForm Model="@Profile" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+
+    <div>
+        <FluentLabel>
+            <FluentIcon Value="@(new Icons.Regular.Size12.Star())"  /> Email
+        </FluentLabel>
+        <FluentTextField @bind-Value="Profile.Email"
+                         TextFieldType="TextFieldType.Email"
+                         Placeholder="you@example.com"
+                         style="width:80%" />
+        <FluentValidationMessage For="@(() => Profile.Email)" />
+    </div>
+
+    <div>
+        <FluentLabel>
+            <FluentIcon Value="@(new Icons.Regular.Size12.Star())" /> Job Title
+        </FluentLabel>
+        <FluentTextField @bind-Value="Profile.Title"
+                         TextFieldType="TextFieldType.Text"
+                         Placeholder="Your age please"
+                         style="width:60%" />
+        <FluentValidationMessage For="@(() => Profile.Title)" />
+    </div>
+
+
+
+    <div>
+        <FluentLabel>Specility</FluentLabel>
+        <FluentTextField @bind-Value="Profile.Specility"
+                         Placeholder="e.g. Jane Doe"
+                         style="width:100%" />
+        <FluentValidationMessage For="@(() => Profile.Specility)" />
+    </div>
+
+    <div>
+        <FluentLabel>Experiance</FluentLabel>
+        <FluentTextArea @bind-Value="Profile.Experiance"
+                         Placeholder="e.g. Jane Doe"
+                         style="width:100%;height:50px" />
+        <FluentValidationMessage For="@(() => Profile.Experiance)" />
+    </div>
+    <div>
+        <FluentSelect TOption="ClinicDto"
+                      Label="Select A Clinic"
+                      Items="@Clinics"
+                      Id="people-listbox"
+                      Width="200px"
+                      Height="250px"
+                      Placeholder="Make a selection..."
+                      OptionValue="@(p => p.Id.ToString())"
+                      OptionText="@(p => p.ClinicName)"
+                      @bind-Value="@ClinicId" />
+    </div>
+    <FluentButton Type="ButtonType.Submit"
+                  Appearance="Appearance.Accent"
+                  Disabled="@isBusy"
+                  style="margin-top:1rem">
+        @(isBusy ? "Saving profile data..." : "Submit")
+    </FluentButton>
+
+</EditForm>
+
+
+@code {
+
+    private bool isBusy = false;
+
+    private StaffDto Profile { get; set; } = new();
+
+    private List<ClinicDto> Clinics { get; set; } = new();
+    private ClinicDto Clinic { get; set; } = new();
+    private string ClinicId { get; set; }=string.Empty;
+    private string Email { get; set; } = string.Empty;
+  protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity != null && user.Identity.IsAuthenticated)
+        {
+            Email = user.Identity.Name ?? string.Empty;
+            await LoadProfile();
+        }
+        else
+        {
+            ToastService.ShowError("You must be logged in to view this page.");
+            Navigation.NavigateTo("/login");
+        }
+    }
+    private async Task LoadProfile()
+    {
+        var profile = await IdentityService.GetProfileData<StaffDto>(Email, true);
+        if (profile != null)
+        {
+            this.Profile = profile;
+            await LoadClinics();
+        }
+    }
+
+    private async Task LoadClinics()
+    {
+        var clinics = await ClinicService.List();
+        if (clinics != null)
+        {
+            this.Clinics = new List<ClinicDto>(clinics);
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (isBusy) return;
+        isBusy = true;
+
+        try
+        {
+            if(Profile.Id==0){
+                await Service.AddNew(Profile);
+
+            }else {
+            await Service.Edit(Profile.Id, Profile);
+            }
+
+            ToastService.ShowSuccess("Profile saved.");
+
+        }
+        catch (HttpRequestException)
+        {
+            ToastService.ShowError("Could not reach the server. Please check your connection and try again.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"An unexpected error occurred: {ex.Message}");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+}
