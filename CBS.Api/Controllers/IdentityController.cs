@@ -39,7 +39,7 @@ namespace CBS.Api.Controllers
             StaffProfile = staffProfile;
         }
 
-        // 🔹 Register new user (external / first Admin)
+        // 🔹 Register new user (external /patients)
         [HttpPost("external")]
         public async Task<IActionResult> RegisterExternal([FromBody] RegisterDto model)
         {
@@ -49,7 +49,7 @@ namespace CBS.Api.Controllers
             var user = new ApplicationUser { UserName = model.Email, Email = model.Email,
                 FullNames=model.FullNames };
             var resultUser = await _userManager.CreateAsync(user, model.Password);
-            var resultRole = await _userManager.AddToRoleAsync(user, "Admin");
+            var resultRole = await _userManager.AddToRoleAsync(user, "User");
 
             if (resultUser.Succeeded && resultRole.Succeeded)
             {
