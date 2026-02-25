@@ -47,9 +47,13 @@ namespace CBS.Api.Controllers
                 return BadRequest("Invalid request");           
 
             var user = new ApplicationUser { UserName = model.Email, Email = model.Email,
-                FullNames=model.FullNames };
+                FullNames=model.FullNames }; 
             var resultUser = await _userManager.CreateAsync(user, model.Password);
-            var resultRole = await _userManager.AddToRoleAsync(user, "User");
+            var roles = await _userManager.GetRolesAsync(user);
+           
+
+            var allroles = roles;
+;            var resultRole = await _userManager.AddToRoleAsync(user, "User");
 
             if (resultUser.Succeeded && resultRole.Succeeded)
             {

@@ -13,7 +13,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // ── Named HttpClient for CBS API ─────────────────────────────────────────────
 builder.Services.AddHttpClient("cbs-api", client =>
-    client.BaseAddress = new Uri("https://localhost:7251/"))
+    client.BaseAddress = new Uri("https://localhost:44398/"))
     .AddHttpMessageHandler<CustomAuthorizationHandler>();
 
 // Default injected HttpClient uses the named client above
