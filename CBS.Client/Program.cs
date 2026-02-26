@@ -32,11 +32,10 @@ builder.Services.AddScoped(typeof(IClientService<>), typeof(ClientService<>));
 builder.Services.AddFluentUIComponents();
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
-// FIX: Register CustomAuthStateProvider so CascadingAuthenticationState works.
-// Without this line you get:
-//   "There is no registered service of type AuthenticationStateProvider"
-builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
-builder.Services.AddScoped<CustomAuthStateProvider>(); // optional, if you want to inject it directly
+// FIX: Register CustomAuthStateProvider and AuthenticationStateProvider so CascadingAuthenticationState works.
+
+builder.Services.AddScoped<AuthenticationStateProvider>();
+builder.Services.AddScoped<CustomAuthStateProvider>(); //add custom provider    
 builder.Services.AddAuthorizationCore();
 
 await builder.Build().RunAsync();
