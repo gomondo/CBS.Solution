@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="../../ClinicBookingSystem/CBS.Solution/CBS.Diagrams/CBS.Diagrams.csproj" Id="a631746c-a5c8-4b74-9040-06d49d95ce23" />
   <Project Path="CBS.Api/CBS.Api.csproj" Id="14178aff-60d1-4ccb-b4ca-d9d7b8fe60ee" />
   <Project Path="CBS.BLL/CBS.BLL.csproj" Id="c751c6ae-5f3e-4459-ac70-2a02623dbeb4" />
   <Project Path="CBS.Client/CBS.Client.csproj" />
