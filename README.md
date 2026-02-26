@@ -67,33 +67,15 @@ The system enables patients to book appointments, view available time slots, and
   - ORM: Entity Framework Core  
   - Mapping: AutoMapper  
   - Validation: FluentValidation  
-  - Logging: NLog or Serilog  
+  - Logging: NLog 
 
 - **Database**: SQL Server / PostgreSQL  
   - EF Core Migrations  
-  - Optional: Dapper for performance-critical queries  
+  - SQL Server Database
 
 - **Authentication & Authorization**  
-  - ASP.NET Identity or Azure AD B2C  
   - JWT Tokens for secure API access  
 
 - **Testing Frameworks**  
   - xUnit / NUnit  
-  - Moq for mocking dependencies  
 
-- **DevOps & CI/CD**  
-  - GitHub Actions or Azure DevOps Pipelines  
-  - Swagger/OpenAPI for API documentation  
-
----
-
-## 🌟 Optional Enhancements
-- **Appointment Reminders**: Twilio or SendGrid  
-- **Calendar Sync**: Outlook API or Google Calendar API  
-- **Real-time Updates**: SignalR  
-- **Specific Data Retrieval**: GraphQL  
-
----
-
-## ⚖️ License
-Internal Use - Department of Health and Wellness.
