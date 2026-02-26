@@ -206,7 +206,7 @@ namespace CBS.Api.Controllers
         }
 
         // Logout
-        [HttpPost("logout")]
+        [HttpGet("logout")]
         public async Task<IActionResult> Logout()
         {
             await _signInManager.SignOutAsync();
@@ -215,6 +215,7 @@ namespace CBS.Api.Controllers
 
         // Change Password
         [HttpPost("change-password")]
+        [Authorize(Roles = "Admin,Staff,User")]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto model)
         {
             var user = await _userManager.FindByEmailAsync(model.Email);
