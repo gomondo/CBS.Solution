@@ -13,7 +13,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // ── Named HttpClient for CBS API ─────────────────────────────────────────────
 builder.Services.AddHttpClient("cbs-api", client =>
-    client.BaseAddress = new Uri("https://localhost:44398/"))
+    client.BaseAddress = new Uri("https://localhost:7251/"))
     .AddHttpMessageHandler<CustomAuthorizationHandler>();
 
 // Default injected HttpClient uses the named client above
@@ -33,9 +33,8 @@ builder.Services.AddFluentUIComponents();
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 // FIX: Register CustomAuthStateProvider and AuthenticationStateProvider so CascadingAuthenticationState works.
-
-builder.Services.AddScoped<AuthenticationStateProvider>();
-builder.Services.AddScoped<CustomAuthStateProvider>(); //add custom provider    
+builder.Services.AddScoped<AuthenticationStateProvider,CustomAuthStateProvider>(); //add custom provider    
+builder.Services.AddScoped<CustomAuthStateProvider>()//for direct access
 builder.Services.AddAuthorizationCore();
 
 await builder.Build().RunAsync();
