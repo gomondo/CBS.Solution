@@ -14,54 +14,16 @@
               Border="WizardBorder.Outside"
               StepTitleHiddenWhen="@GridItemHidden.XsAndDown"
               Height="auto"
-              Style="min-height: 300px;"
-              OnFinish="@OnFinishedAsync">
+              Style="min-height: 300px;">
     <Steps>
-        <FluentWizardStep Label="Personal Info"
-                          OnChange="@OnStepChange">
-            <FluentEditForm Model="_formData1" FormName="personalInfo" OnValidSubmit="OnValidSubmit" OnInvalidSubmit="OnInvalidSubmit">
-                <DataAnnotationsValidator />
-                <FluentStack Orientation="Orientation.Vertical">
-                    <FluentTextField Placeholder="First Name" @bind-Value="_formData1.FirstName" />
-                    <FluentTextField Placeholder="Last Name" @bind-Value="_formData1.LastName" />
-                </FluentStack>
-                <FluentValidationSummary style="color:darkred" />
-            </FluentEditForm>
+        <FluentWizardStep Label="Choose an open Timeslots">
+   
+              <Timeslot/>
+        
         </FluentWizardStep>
-        <FluentWizardStep Label="Address Info"
-                          OnChange="@OnStepChange">
-            <FluentEditForm Model="_formData2" FormName="addressInfo" OnValidSubmit="OnValidSubmit" OnInvalidSubmit="OnInvalidSubmit">
-                <DataAnnotationsValidator />
-                <FluentStack Orientation="Orientation.Vertical">
-                    <FluentTextField Placeholder="Address Line 1" @bind-Value="_formData2.AddressLine1" />
-                    <FluentTextField Placeholder="Address Line 2" @bind-Value="_formData2.AddressLine2" />
-                    <FluentTextField Placeholder="City" @bind-Value="_formData2.City" />
-                    <FluentTextField Placeholder="State or Province" @bind-Value="_formData2.StateOrProvince" />
-                    <FluentTextField Placeholder="Country" @bind-Value="_formData2.Country" />
-                    <FluentTextField Placeholder="Postal Code" @bind-Value="_formData2.PostalCode" />
-                </FluentStack>
-                <FluentValidationSummary style="color:darkred" />
-            </FluentEditForm>
-        </FluentWizardStep>
-        <FluentWizardStep Label="Set budget"
-                          Summary="Identify the best price"
-                          IconPrevious="@(new Icons.Filled.Size24.Previous())"
-                          IconCurrent="@(new Icons.Filled.Size24.StarEmphasis())"
-                          IconNext="@(new Icons.Regular.Size24.Star())"
-                          DisplayStepNumber="false"
-                          OnChange="@OnStepChange">
-            <FluentSelect Items="@(Enumerable.Range(10, 80).Select(i => i.ToString()))"
-                          Style="min-width: 70px;"
-                          Height="300px" />
-        </FluentWizardStep>
+            <Appointments/>
         <FluentWizardStep Label="Finish">
-            <FluentEditForm Model="_finishFormData" FormName="finishForm" OnValidSubmit="OnValidSubmit" OnInvalidSubmit="OnInvalidSubmit">
-                <DataAnnotationsValidator />
-                <FluentStack Orientation="Orientation.Vertical">
-                    <FluentTextField Label="Signature" Placeholder="Type your signature" @bind-Value="_finishFormData.Signature" />
-                </FluentStack>
-                <FluentValidationSummary style="color:darkred" />
-            </FluentEditForm>
+          <FluentButton  OnClick="GoToBooking" >Done</FluentButton>
         </FluentWizardStep>
     </Steps>
 </FluentWizard>
