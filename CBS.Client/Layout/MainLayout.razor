@@ -1,11 +1,16 @@
 ﻿@using Blazored.LocalStorage
+@using CBS.Client.Auth
 @using CBS.Client.Pages.Components
+@using CBS.Client.Services
 @using Icon = Microsoft.FluentUI.AspNetCore.Components.Icons
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.FluentUI.AspNetCore.Components
-@inject NavigationManager Navigation
 
+@inject NavigationManager Navigation
+@inject IdentityClientService IdentityService
+@inject CustomAuthStateProvider AuthenticationProvider
 @inherits LayoutComponentBase
+
 <div class="page">
     <div class="sidebar">
         <NavMenu />
@@ -13,15 +18,12 @@
 
     <main>
         <div class="top-row px-4">
-  <AuthorizeView>
-    <Authorized>
-      <FluentButton OnClick="@(() => { LoginDialog?.Show(); })">Logout</FluentButton>  
-    </Authorized>
-    <NotAuthorized>
-       <FluentButton OnClick="OnLoginOpen">Login</FluentButton>
+         @if(IsLogedIn){
+      <FluentButton OnClick="OnLogout">Logout</FluentButton>  
+         }else {
+     <FluentButton OnClick="OnLoginOpen">Login</FluentButton>
      <FluentButton OnClick="OnRegisterOpen">Register</FluentButton>
-    </NotAuthorized>
-</AuthorizeView>
+         }
         </div>
 
         <article class="content px-4" >
@@ -37,7 +39,18 @@
     private bool LoginHidden = true;
     public FluentDialog? RegisterDialog;
     public FluentDialog?  LoginDialog;
+    private bool IsLogedIn { get; set; }
+    protected async override Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationProvider.GetAuthenticationStateAsync();
 
+        if (authState != null && authState.User!=null)
+        {
+            IsLogedIn = authState.User.Identity.IsAuthenticated;
+        }
+
+         await base.OnInitializedAsync();
+    }
     void OnRegisterOpen()
     {
         RegisterHidden = false;
@@ -49,8 +62,14 @@
     void CloseLoginDialog()
     {
         LoginHidden = true;
-        Navigation.NavigateTo("profile");
+        Navigation.NavigateTo("profile",true);
     }   
+    async Task OnLogout()
+    {
+       await IdentityService.Logout();
+     
+        LoginDialog?.Show(); 
+    }
 }
 <FluentDialog @ref="RegisterDialog" @bind-Hidden="@RegisterHidden" aria-label="Register a new account..." Modal=true>
     <FluentDialogHeader Visible="true" ShowDismiss="true" />

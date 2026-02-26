@@ -46,6 +46,27 @@ namespace CBS.Client.Services
             }
         }
 
+        public async Task<KeyValuePair<bool, string>> Logout()
+        {
+            try
+            {
+
+                var requestUrl = $"{_httpClient.BaseAddress.AbsoluteUri}api/Identity/logout";
+
+                var message = await _httpClient.GetStringAsync(requestUrl);
+
+  
+                return new KeyValuePair<bool, string>(true, message);       
+            }
+            catch (HttpRequestException hex)
+            {
+                throw hex;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
         public async Task<KeyValuePair<bool, string>> Login(LoginModel login)
         {
             // Validate input
@@ -82,7 +103,7 @@ namespace CBS.Client.Services
         {
             // Validate input
             if (string.IsNullOrWhiteSpace(email))
-                throw new ArgumentNullException("Email Feiled is required.");
+                throw new ArgumentNullException("Email field is required.");
 
             T response;
 
