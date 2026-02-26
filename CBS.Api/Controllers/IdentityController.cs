@@ -150,17 +150,15 @@ namespace CBS.Api.Controllers
             }
         }
         [HttpGet("profile/practitioner/{email}")]
-        [Authorize(Roles = "Admin")]
+       // [Authorize(Roles = "Admin")]
         public async Task<ActionResult<StaffDto>>GetStaffProfile(string email)
         {
             var user = _userManager.Users.FirstOrDefault(u => u.Email == email);
             if (user == null)
                 return NotFound("User not found");
 
-            StaffDto profile = new();
-
-            if (User.IsInRole("Staff")|| User.IsInRole("Admin"))
-            {
+                StaffDto profile = new();
+               
                 var staffs = await StaffProfile.All();
 
                 if (staffs == null)
@@ -171,14 +169,14 @@ namespace CBS.Api.Controllers
                     return NotFound("Staff profile not found");
 
                 profile = staff;
-            }
+            
 
 
             return Ok(profile);
            
         }
         [HttpGet("profile/patient/{email}")]
-        [Authorize(Roles = "Admin,User")]
+        //[Authorize(Roles = "Admin,Staff,User")]
         public async Task<ActionResult<PatientDto>> GetPatientProfile(string email)
         {
             var user = _userManager.Users.FirstOrDefault(u => u.Email == email);
@@ -187,9 +185,7 @@ namespace CBS.Api.Controllers
 
             PatientDto profile = new();
 
-          
-            if (User.IsInRole("User")|| User.IsInRole("Admin"))
-            {
+        
                 var patients = await PatientProfile.All();
 
                 if (patients == null)
@@ -200,7 +196,7 @@ namespace CBS.Api.Controllers
                     return NotFound("Patient profile not found");
 
                 profile = patient;
-            }
+            
             if (profile == null)
                 return NotFound("not found");
 
